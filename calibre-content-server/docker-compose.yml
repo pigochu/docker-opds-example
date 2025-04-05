@@ -26,8 +26,6 @@ services:
       - LC_ALL=zh_TW.UTF-8
       - TZ=Asia/Taipei
 
-    # overlayfs 用法
-    # https://gist.github.com/detunized/7c8fc4c37b49c5475e68ef9574587eee
     cap_add:
       - SYS_ADMIN
     entrypoint: >
@@ -42,11 +40,11 @@ services:
           mount -t overlay overlay -o lowerdir=/books-ro,upperdir=/tmp/overlay/upper,workdir=/tmp/overlay/work /books
 
           echo "啟動 content-server"
-          calibre-server "/books/漫畫" "/books/漫畫-升頻版" "/books/X書" --port=8880 --enable-auth --userdb /config/users.sqlite & echo $! > /tmp/calibre.pid
+          calibre-server "/books/漫畫" "/books/漫畫-升頻版" --port=8880 --enable-auth --userdb /config/users.sqlite & echo $! > /tmp/calibre.pid
           SERVER_PID=$$(cat /tmp/calibre.pid)
           sleep 1
           echo "monitoring database"
-          inotifywait -e attrib "/books-ro/漫畫/metadata.db" "/books-ro/漫畫-升頻版/metadata.db" "/books-ro/X書/metadata.db" |
+          inotifywait -e attrib "/books-ro/漫畫/metadata.db" "/books-ro/漫畫-升頻版/metadata.db" |
           while read -r file event; do
             now=$$(date "+%Y-%m-%d %H:%M:%S")
             echo "$$now 偵測到 $$file 發生異動。"
