@@ -11,7 +11,7 @@
 ## docker-compose.yml 概念說明
 
 1. service `calibre-content-server` 分別提供 `漫畫` 與 `漫畫-升頻版` 的 Web 與 OPDS 服務。
-2. 使用 `dockerfile_inline` 語法建立一個乾淨的 Image，並且 entryscript 只啟動 `calibre-server`。
+2. 使用 `dockerfile_inline` 語法建立一個乾淨的 Image，並且 entrypoint 只啟動 `calibre-server`。
 3. `cap_add: ` 設定為 `SYS_ADMIN` 才能於 container 內 mount 一個 overlayfs 目錄。
-4. entryscript 內建立了 `/books` 並 mount 為 overlayfs 來對應 `/books-ro`，`/books` 才是讓 `calibre-server` 存取用的。
+4. entrypoint 內建立了 `/books` 並 mount 為 overlayfs 來對應 `/books-ro`，`/books` 才是讓 `calibre-server` 存取用的。
 5. inotifywait 則分別監控各書庫的 `metadata.db` 是否異動，若有異動，則重新掛載 `/books` 並啟動 `calibre-server`。
