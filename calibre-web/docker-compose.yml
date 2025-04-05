@@ -1,0 +1,77 @@
+services:
+  calibre-web-comic:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web-comic
+    restart: unless-stopped
+    environment:
+      - PUID=500
+      - PGID=500
+      - TZ=Asia/Taipei
+      - CALIBRE_RECONNECT=1
+      # - DOCKER_MODS=linuxserver/mods:universal-calibre #optional
+      # - OAUTHLIB_RELAX_TOKEN_SCOPE=1 #optional
+    volumes:
+      - config-comic:/config
+      - "/share/homes/pigo/.Qsync/calibre 書庫/漫畫:/books:ro"
+    ports:
+      - 8083:8083
+
+  calibre-web-comic-upscale:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web-comic-upscale
+    restart: unless-stopped
+    environment:
+      - PUID=500
+      - PGID=500
+      - TZ=Asia/Taipei
+      - CALIBRE_RECONNECT=1
+      # - DOCKER_MODS=linuxserver/mods:universal-calibre #optional
+      # - OAUTHLIB_RELAX_TOKEN_SCOPE=1 #optional
+    volumes:
+      - config-comic-upscale:/config
+      - "/share/homes/pigo/.Qsync/calibre 書庫/漫畫-升頻版:/books:ro"
+    ports:
+      - 8084:8083
+
+
+
+  intofy:
+    container_name: calibre-monitor
+    image: inotify-curl-qnap:0.0.1
+    build:
+      context: ./
+      dockerfile_inline: |
+            FROM alpine
+            RUN apk --no-cache add inotify-tools curl bash
+    restart: unless-stopped
+    user: "500:500"
+    depends_on:
+      - calibre-web-comic
+      - calibre-web-comic-upscale
+    entrypoint: >
+      bash -c '
+        declare -A file_to_api=(
+            ["/books/漫畫/metadata.db"]="http://calibre-web-comic:8083/reconnect"
+            ["/books/漫畫-升頻版/metadata.db"]="http://calibre-web-comic-upscale:8083/reconnect"
+        )
+
+        files=("$${!file_to_api[@]}")
+
+        while true; do
+          inotifywait -e attrib "$${files[@]}" |
+          while read -r file event; do
+            now=$$(date "+%Y-%m-%d %H:%M:%S")
+            echo "Detect $$file changed at $$now"
+            echo "Call API: $${file_to_api[$$file]}"
+            curl "$${file_to_api[$$file]}"
+            sleep 1
+          done
+        done
+      '
+    volumes:
+      - "/share/homes/pigo/.Qsync/calibre 書庫:/books:ro"
+
+
+volumes:
+  config-comic:
+  config-comic-upscale:

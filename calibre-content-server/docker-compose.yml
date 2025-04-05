@@ -1,0 +1,77 @@
+services:
+  calibre-content-server:
+    container_name: calibre-content-server
+    image: calibre-content-server:8.1.1.011
+    build:
+      context: ./
+      #  RUN apt update && apt install inotify-tools wget python3 libegl-dev libopengl0 libxcb-cursor-dev libfreetype-dev xz-utils python3-pyqt6 -y
+
+      dockerfile_inline: |
+          FROM debian:bookworm
+          RUN apt update && \
+              apt install -y \
+              locales inotify-tools ca-certificates wget xz-utils psmisc \
+              python3 python3-pyqt6 libopengl0 libxcb-cursor0 libegl1 libopengl0 libfreetype6  && \
+              locale-gen zh_TW.UTF-8
+          RUN wget -nv -O- https://download.calibre-ebook.com/linux-installer.sh | sh /dev/stdin version=8.1.1
+          RUN apt clean
+    # restart: unless-stopped
+    # user: "500:500"
+    ports:
+      - 8880:8880
+    volumes:
+      - "config:/config"
+      - "/share/homes/pigo/.Qsync/calibre 書庫:/books-ro:ro"
+    environment:
+      - LC_ALL=zh_TW.UTF-8
+      - TZ=Asia/Taipei
+
+    # overlayfs 用法
+    # https://gist.github.com/detunized/7c8fc4c37b49c5475e68ef9574587eee
+    cap_add:
+      - SYS_ADMIN
+    entrypoint: >
+      bash -c '
+        set -e
+
+        mkdir -p /books
+        mkdir -p /tmp/overlay
+        mount -t tmpfs tmpfs /tmp/overlay
+        while true; do
+          mkdir -p /tmp/overlay/{upper,work}
+          mount -t overlay overlay -o lowerdir=/books-ro,upperdir=/tmp/overlay/upper,workdir=/tmp/overlay/work /books
+
+          echo "啟動 content-server"
+          calibre-server "/books/漫畫" "/books/漫畫-升頻版" "/books/X書" --port=8880 --enable-auth --userdb /config/users.sqlite & echo $! > /tmp/calibre.pid
+          SERVER_PID=$$(cat /tmp/calibre.pid)
+          sleep 1
+          echo "monitoring database"
+          inotifywait -e attrib "/books-ro/漫畫/metadata.db" "/books-ro/漫畫-升頻版/metadata.db" "/books-ro/X書/metadata.db" |
+          while read -r file event; do
+            now=$$(date "+%Y-%m-%d %H:%M:%S")
+            echo "$$now 偵測到 $$file 發生異動。"
+
+            echo "停止 content-server , PID=$$SERVER_PID"
+            kill $$SERVER_PID
+            while ps -o pid= --ppid $$SERVER_PID > /dev/null; do
+              echo "尚有子行程未結束，一秒鐘後再檢查"
+              sleep 1
+            done
+            echo "所有子行程已結束。"
+
+            while kill -0 "$$SERVER_PID" 2>/dev/null; do
+              echo "主行程 (PID: $$SERVER_PID) 仍在執行中，一秒鐘後再檢查"
+              sleep 1
+            done
+            echo "主行程已結束。"
+
+            ps aux
+
+            echo "清除 overlayfs 資料"
+            umount /books
+            rm -rf /tmp/overlay/{upper,work}
+          done
+        done
+      '
+volumes:
+  config:
