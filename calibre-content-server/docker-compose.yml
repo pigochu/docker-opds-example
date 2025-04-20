@@ -1,7 +1,7 @@
 services:
   calibre-content-server:
     container_name: calibre-content-server
-    image: calibre-content-server:8.1.1.011
+    image: calibre-content-server:8.3.0.001
     build:
       context: ./
       #  RUN apt update && apt install inotify-tools wget python3 libegl-dev libopengl0 libxcb-cursor-dev libfreetype-dev xz-utils python3-pyqt6 -y
@@ -14,7 +14,7 @@ services:
               python3 python3-pyqt6 libopengl0 libxcb-cursor0 libegl1 libopengl0 libfreetype6  && \
               locale-gen zh_TW.UTF-8 && \
               localedef -i zh_TW -f UTF-8 zh_TW.UTF-8
-          RUN wget -nv -O- https://download.calibre-ebook.com/linux-installer.sh | sh /dev/stdin version=8.1.1
+          RUN wget -nv -O- https://download.calibre-ebook.com/linux-installer.sh | sh /dev/stdin version=8.3.0
           RUN apt clean
     # restart: unless-stopped
     # user: "500:500"
@@ -41,7 +41,7 @@ services:
           mount -t overlay overlay -o lowerdir=/books-ro,upperdir=/tmp/overlay/upper,workdir=/tmp/overlay/work /books
 
           echo "啟動 content-server"
-          calibre-server "/books/漫畫" "/books/漫畫-升頻版" --port=8880 --enable-auth --userdb /config/users.sqlite & echo $! > /tmp/calibre.pid
+          calibre-server "/books/漫畫" "/books/漫畫-升頻版" --port=8880 --shutdown-timeout=5 --enable-auth --userdb /config/users.sqlite & echo $! > /tmp/calibre.pid
           SERVER_PID=$$(cat /tmp/calibre.pid)
           sleep 1
           echo "monitoring database"
